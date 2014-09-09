@@ -1,0 +1,574 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+ <meta charset="UTF-8">
+ <title>Xenophobia XML-RPC library manual</title>
+ <meta name="author" content="J. King &amp; Dustin Wilson">
+ <link rel="stylesheet" type="text/css" href="http://jkingweb.ca/code/documentation.css">
+ <link rel="author" href="http://jkingweb.ca/">
+ <link rel="up" href="http://jkingweb.ca/code/php/lib.xmlrpc/">
+</head>
+<body>
+<h1>Xenophobia XML-RPC library manual</h1>
+
+
+<div id="preface"> 
+ <h2>Preface</h2>
+ <p>"Xenophobia" is an XML-RPC client and server library for PHP5.  It conforms to the last revision of the specification and implements several extensions.
+ <p>The primary goals of this library are ease of use (as little code as possible should be needed to interact with the library) and data integrity (well-formed and valid XML).  All other concerns, including PHP compatibility, efficiency and extensibility are secondary.
+ <p>Questions and comments are very welcome, and should be directed to the author via <a href="http://jkingweb.ca/">his Web site</a>.
+ <p><a href="http://jkingweb.ca/code/php/lib.xmlrpc/download">Download current version</a> (<a href="http://jkingweb.ca/code/php/lib.xmlrpc/archives">archives</a>)
+</div>
+
+<div id="contents">
+ <h2>Table of contents</h2>
+ <h3>Prefaces</h3>
+ <ol>
+  <li><a href="#preface">Preface</a>
+  <li><a href="#contents">Table of contents</a>
+  <li><a href="#features">Features</a>
+  <li><a href="#requirements">Requirements</a>
+ </ol>
+ <h3>Body</h3>
+ <ol>
+  <li><a href="#usage">Using the library</a>
+   <ol>
+    <li><a href="#usage-server">Using the server</a>
+     <ol>
+      <li><a href="#usage-server-errors">Catching exceptions and errors</a>
+      <li><a href="#usage-server-cap">Adding capabilities</a>
+      <li><a href="#usage-server-selftest">Server self-test</a>
+     </ol>
+    <li><a href="#usage-client">Using the client</a>
+     <ol>
+      <li><a href="#usage-client-multi">Multicall</a>
+     </ol>
+   </ol>
+  <li><a href="#conf">Configuration properties</a>
+   <ol>
+    <li><a href="#conf-lib">Library properties</a>
+    <li><a href="#conf-server">Server properties</a>
+    <li><a href="#conf-client">Client properties</a>
+   </ol>
+  <li><a href="#types">Type conversion</a>
+   <ol>
+    <li><a href="#types-faults">Fault handling</a>
+    <li><a href="#types-array">Array disambiguation</a>
+    <li><a href="#types-null">Null handling</a>
+    <li><a href="#types-datetime">Datetime handling</a>
+    <li><a href="#types-base64">Base64-encoded data</a>
+   </ol>
+ </ol>
+ <h3>Appendices</h3>
+ <ol>
+  <li><a href="#append-types">Type conversion tables</a>
+  <li><a href="#append-schema">RELAX NG schema</a>
+  <li><a href="#append-ext">Extending the library</a>
+  <li><a href="#append-credits">Credits and licensing</a>
+  <li><a href="#append-history">Revision history</a>
+ </ol>
+</div>
+<div id="features">
+ <h2>Features</h2>
+ <h3>Conformance</h3>
+ <ul>
+  <li>Conforms to June 30, 2003 revision of <a href="http://www.xmlrpc.com/spec">the XML-RPC specification</a>
+  <li>Implements <a href="http://tech.groups.yahoo.com/group/xml-rpc/message/2897">capabilities</a>, <a href="http://phpxmlrpc.sourceforge.net/doc-1.1/ch08.html">introspection</a>, and <a href="http://xmlrpc-epi.sourceforge.net/specs/rfc.fault_codes.php">interoperable fault codes</a>
+  <li>Implements <a href="http://web.archive.org/web/20060502175739/http://www.xmlrpc.com/discuss/msgReader$1208">system.multicall</a>
+  <li>Implements <a href="http://ontosys.com/xml-rpc/extensions.php">&lt;nil> element</a>
+ </ul>
+ <h3>Integrity</h3>
+ <ul>
+  <li>All XML generation and parsing performed via DOM
+  <li>RELAX NG schema validation on server- and client-side
+  <li>Server-side error handlers to further minimize malformed XML
+ </ul> 
+ <h3>Usability</h3>
+ <ul>
+  <li>Automatic type conversion to and from native PHP types
+  <li>XML-RPC faults implemented as throwable exceptions
+  <li>Transparent server-side multicall handling
+  <li>Informative self-test on server GET requests
+ </ul>
+</div>
+<div id="requirements">
+ <h2>Requirements</h2>
+ <ul>
+  <li>PHP 5.0 or later
+  <li>cURL or HTTP stream wrapper enabled
+ </ul>
+ <p>No other requirements are known to me.  In limited testing PHP 5.0.0 appeared to crash the server; PHP 5.0.5 performed without upset.
+</div> 
+
+<div id="usage">
+ <h2>Using the library</h2>
+  <p>Xenopohobia largely constitutes of a server class and a client class.  Both need to be instantiated to be used.
+  <h3 id="usage-server">Using the server</h3>
+  <div>
+  <p class="samp"><samp><var>XMLRPCServer</var> XMLRPCServer::__construct ( <var>void</var> )</samp>
+  <p>Once the server is instantiated it will have a number of "system" procedures, but will not serve incoming requests unless told to do so:
+  <p class="samp"><samp><var>void</var> XMLRPCServer::serve ( <var>void</var> ) </samp>
+  <p>At this point the server will process requests, but a server composed of only the basic system procedures doesn't do much.  Procedure calls should first be added:
+  <p class="samp"><samp><var>bool</var> XMLRPCServer::addCall ( <var>string name</var>, <var>callback callback</var> [, <var>array signature</var> [, <var>string help</var>]] )</samp>
+  <p>Above, <var>name</var> is an identifier for use by clients (eg. <samp>system.listMethods</samp>, <samp>math.sqRoot</samp>), <var>callback</var> is a callback as described in <a href="http://ca3.php.net/manual/en/language.pseudo-types.php#language.types.callback">Ch.11, &sect;10 of the PHP manual</a>.  <var>Signature</var> is a method signature as described by <a href="http://phpxmlrpc.sourceforge.net/doc-1.1/ch05s05.html#signatures">the original implementation</a>: the array's first member is the return type; subsequent members are the types of required arguments.  Finally, <var>help</var> is a human-readable, freeform description of the method.
+  <p>Note that a method may have several signatures, but <code>addCall</code> only accepts one.  Additional signatures may be defined with <code>addSignature</code>:
+  <p class="samp"><samp><var>bool</var> XMLRPCServer::addSignature ( <var>string call</var>, <var>array signature</var> )</samp>
+  <p>If <var>call</var> is not yet defined, the method will return <samp>FALSE</samp>.
+  <p>Below are some simple examples of server usage:
+  <pre>&lt;?php
+// Implementing the familiar PHP "implode" function as an RPC
+$server = new XMLRPCServer();
+$server->addCall("string.concat", "implode", array("string", "array"), "Takes an array of strings (optionally with a 'glue' string) and returns a concatenation.");
+$server->addSignature("string.concat", array("string", "string", "array"));
+$server->serve();</pre>
+ <pre>&lt;?php
+// Implementing something similar to the above
+
+// First have a callback, in this case a function
+function xmlrpc_concat()
+ {$args = func_get_args();
+  if (sizeof($args)==1 &amp;&amp; is_array($args[0]))
+   {return implode("", $args[0]);}
+  elseif (sizeof($args) &lt; 2)
+   {return new XMLRPCException("No strings to concatenate", 0);}
+  else
+   {return implode("", $args);}
+ }
+
+//Now start the server
+$server = new XMLRPCServer();
+$server->addCall("string.concat", "xmlrpc_concat", array("string", "array"), "Takes an array of strings or a variable number of strings and concatenates them.");
+$server->addSignature("string.concat", array("string", "string", "string"));
+$server->serve();</pre>
+ <h4 id="usage-server-errors">Catching exceptions and errors</h4>
+ <p>The Xenophobia server sends its reply by outputting as any other PHP script with <code>echo</code>.  Because of this, printed error messages will usually cause the server to send malformed XML to clients.
+ <p>To prevent this, one may set PHP to report no errors (by using <code>error_reporting(0)</code>), but this has the disadvantage of giving no indication when an unforeseen, possibly serious problem has occured with the server.  Xenophobia provides a more elegant solution: the static method <code>XMLRPCServer::handleErrors()</code>.
+ <p>This method, which can be called as soon as the library is included, reports any errors or uncaught exceptions that would normally be printed as an XML-RPC fault.  Note, however, that when using this method <em>all</em> errors within the error-reporting threshold are considered fatal.  Parse errors and the like, of course, cannot be caught by this facility.
+ <p>Below is a simplistic example of how this works:
+ <pre>&lt;?php
+XMLRPCServer::handleErrors();                       //hand off error handling
+$document = DOMDocument::loadXML("&lt;malformedXML>"); //try to parse bad XML; this would print warnings
+
+// The server will respond with this message (formatted here for readability):
+/*
+&lt;?xml version="1.0"?>
+&lt;!--
+This message is an XML-RPC server response, generated due to an error in
+the script automating this server.  If you were expecting something other
+than an XML-RPC response, the error is likely beyond your control.
+-->
+&lt;methodResponse>&lt;fault>&lt;value>
+ &lt;struct>
+  &lt;member>
+   &lt;name>faultCode&lt;/name>
+   &lt;value>&lt;int>-32500&lt;/int>&lt;/value>
+  &lt;/member>
+  &lt;member>
+   &lt;name>faultString&lt;/name>
+   &lt;value>&lt;string>DOMDocument::loadXML(): Premature end of data in tag malformedXML line 1 in Entity, line: 1 (PHP code: 2)&lt;/string>&lt;/value>
+  &lt;/member>
+ &lt;/struct>
+&lt;/value>&lt;/fault>&lt;/methodResponse>
+*/</pre>
+ <h4 id="usage-server-cap">Adding capabilities</h4>
+ <p>Server capabilities (which can be enumerated with the procedure call <code>system.getCapabilities</code>) are an advisory list of what the server can do.  Typically, this is a list of specifications which the given server adheres to.  The list of capabilities for a base Xenophobia server is provided in brief <a href="#features">in the preface</a>.
+ <p>To add a capability, the method <code>XMLRPCServer::addCapability()</code> is used:
+ <p class="samp"><samp><var>bool</var> XMLRPCServer::addCapability ( <var>string name</var>, <var>string spec_url</var>, <var>int spec_version</var> )</samp>
+ <p><var>name</var> is an arbitrary name for the capability, sometimes provided by specifications, but often not.  <var>spec_url</var> is a URL to the specification of the given capability, and <var>spec_version</var> is an integer version number for the specification; ideally this should be a revision date in YYYYMMDD form, but exact revision dates are sometimes difficult to ascertain.  
+ <p>Herewith an example, adding a capability for "Pingback":
+ <pre>&lt;?php
+$server = new XMLRPCServer();
+$server->addCapability("pingback", "http://www.hixie.ch/specs/pingback/pingback", 20070114);
+$server->serve();</pre>
+ <h4 id="usage-server-selftest">Server self-test</h4>
+ <p>As a convenience to both users and authors and as a reasonably complete test of the Xenophobia library, HTTP GET requests to a Xenophobia server will present a nicely-formatted HTML document containing a list of capabilities and procedure calls implemented by that particular server.
+ <p>This list acts as a fairly complete test of the library since the server queries itself with a client: all data about the server is retrieve via RPCs, and the following functions are tested:
+ <ul>
+  <li>The client calls <code>system.getCapabilities</code>
+  <li>The client calls <code>system.listMethods</code>
+  <li>The client calls <code>system.methodSignature</code> and <code>system.methodHelp</code> multiple times using <code>system.multicall</code>
+ </ul>
+ <p>As this document is presented once <code>XMLRPCServer::serve()</code> is called, the list of capabilities and procedure calls should always be accurate.
+ </div>
+ <h3 id="usage-client">Using the client</h3>
+ <div>
+ <p>Using the Xenophobia client is quite simple.  First a client instance must be created:
+ <p class="samp"><samp><var>XMLRPCClient</var> XMLRPCClient::__construct ( <var>string server_url</var> )</samp>
+ <p>The <var>server_url</var> must be an absolute URL to an XML-RPC server.  Explicit credentials or port number are allowed.
+ <p>Once a server has been specified the client can then perform an unlimited number of procedure calls with the <code>XMLRPCClient::call()</code> method:
+ <p class="samp"><samp><var>mixed</var> XMLRPCClient::call ( <var>string call</var> [, <var>mixed parameter</var>... ] )</samp>
+ <p>When using this method, the <var>call</var> and zero or more <var>parameter</var>s are sent to the server for processing.  The server's reply is then returned, whether it be the expected result or an XML-RPC fault.
+ <p>It is the responsibility of the user to ensure that the data type of each parameter matches what the server expects.  Although the Xenophobia server will gladly accept values that are of a different type thanks to PHP's type juggling, other servers may fail in this case.
+ <p>Below is an example of the client's use.
+ <pre>&lt;?php
+// retrieve the current time from UserLand's time server
+$client = new XMLRPCClient("http://time.xml-rpc.com/RPC2");
+$result = $client->call("currentTime.getCurrentTime"); //returns a "DateTime" object
+echo $result->format("r");
+
+/* prints, for example:
+
+Fri, 02 Feb 2007 14:49:17 -0500
+
+*/</pre>
+ <h4 id="usage-client-multi">Multicall</h4>
+ <p><code>system.multicall</code> is a procedure call that allows a client to perform an arbitrary number of calls with a single request.  This has the advantage of reducing HTTP traffic, and cutting down the time and processing power needed to perform multiple requests.
+ <p>Xenophobia implements <code>system.multicall</code> thus: First, procedure calls must be added to a queue:
+ <p class="samp"><samp><var>bool</var> XMLRPCClient::addCall ( <var>string call</var> [, <var>mixed parameter</var>...] )</samp>
+ <p>Once all desired calls are queued, the multicall itself is executed:
+ <p class="samp"><samp><var>array</var> XMLRPCClient::call ( <var>void</var> )</samp>
+ <p>Returned is an array of values, one for each call in the queue.  If the <code>XMLRPCClient::call()</code> method is passed parameters while there are calls in the queue, the specified call bypasses the queue entirely and is executed immediately.
+ <p>The queue is cleared whenever a multicall is performed, but it can also be cleared explicitly:
+ <p class="samp"><samp><var>void</var> XMLRPCClient::clear ( <var>void</var> )</samp>
+ <p>Note that <code>system.multicall</code> can also be used like any other procedure call.  This is especially useful to test whether a server implements it.
+ </div>
+</div>
+
+<div id="conf">
+ <h2>Configuration properties</h2>
+ <h3 id="conf-lib">Library properties</h3>
+ <div>
+ <p>Xenophobia has a small number of public properties used for configuration purposes.  Of these, only two---both static properties---are not properties of the <code>XMLRPCServer</code> or <code>XMLRPCClient</code> classes:
+ <dl>
+  <dt><var>XMLRPCLib::$useNil</var>
+   <dd>This static property is used by both the server and the client to decide whether to use the explicit <code>nil</code> element when sending messages.  This property is set to <samp>FALSE</samp> by default; in this case the library will use an empty <code>value</code> element in its messages.  Note that neither of these two behaviours are standard: other clients and servers may refuse messages containing either implicit or explicit <samp>NULL</samp> values.
+  <dt><var>XMLRPCLib::$schema</var>
+   <dd>This static property contains the RELAX NG schema (in XML form) used by Xenophobia when validating messages.
+ </dl>
+ </div> 
+ <h3 id="conf-server">Server properties</h3>
+ <div>
+ <dl>
+  <dt><var>XMLRPCServer::$useSchema</var>
+   <dd>This property sets whether the server should validate incoming messages using the library's RELAX NG schema.  It defaults to <samp>TRUE</samp>.
+  <dt><var>XMLRPCServer::$inputSource</var>
+   <dd>This property defines the stream URI from which the server will pull the incoming message.  Set to <samp>php://input</samp> by default, it should be changed only for debugging purposes.  Changing this property disables both the server's GET self-test and <var>Content-Type</var> checking.  See also <a href="http://ca3.php.net/manual/en/wrappers.php">Appendix M of the PHP manual</a> for information on possible values.
+ </dl>
+ </div>
+ <h3 id="conf-client">Client properties</h3>
+ <div>
+ <dl>
+  <dt><var>XMLRPCClient::$useSchema</var>
+   <dd>This property sets whether the client should validate incoming messages using the library's RELAX NG schema.  It defaults to <samp>TRUE</samp>.
+  <dt><var>XMLRPCClient::$useCurl</var>
+   <dd>This property sets whether the clint should should try using cURL (if available) to send its messages before falling back to using the HTTP stream wrapper.  It is <samp>TRUE</samp> by default.
+  <dt><var>XMLRPCClient::$debug</var>
+   <dd>This property sets the client in debug mode.  In this mode any call will return, instead of the response data, an array with the keys <var>request</var> and <var>response</var>, which will contain the serialized XML data sent to and received from the server respectively.  No validation will be done on the response.  If using cURL the HTTP header is included with the reponse.  This property is set to <samp>FALSE</samp> by default.
+  <dt><var>XMLRPCClient::$throw</var>
+   <dd>This property sets whether the client will throw XML-RPC faults as exceptions instead of returning them as with other values.  The default is <samp>FALSE</samp>.
+ </dl>
+ </div>
+</div>
+
+<div id="types">
+ <h2>Type conversion</h2>
+ <p>Most data types defined by the XML-RPC specification have direct mappings to PHP types, and conversion between these types is handled automatically by Xenophobia both for the server and the client.  There are, however, a few notable peculiarities in the conversion between some types, and others simply have no equivalency.  These limitations and peculiarities are documented here.
+ <p>There are also tables summarizing type mappings in <a href="#append-types">Appendix A</a>.
+
+ <h3 id="types-faults">Fault handling</h3>
+<div>
+ <p>XML-RPC faults are somewhat analogous to PHP exceptions; consequently faults are implemented as exceptions via the class <code>XMLRPCException</code>.  This class functions exactly as a typical exception would.  
+ <p>When a procedure call on the server needs to return a fault, an <code>XMLRPCException</code> instance can be either returned or thrown: in either case the server will capture it and convert it to the proper XML structure.  When the client receives or produces a fault, it will be returned; exceptions are thrown only if the client is configured to do so.  See <a href="#conf-client">&sect;2.3</a> for details.
+</div>
+
+ <h3 id="types-array">Array disambiguation</h3>
+<div>
+ <p>XML-RPC has two compound types: arrays and structs.  Unlike in PHP, XML-RPC arrays are only a collection of values; no keys are stored.  Instead, structs are used when key preservation is desired.  This, however, presents a problem when converting a PHP array: is it an array or a struct?  Xenophobia answers this question using a fairly simple algorithm:  
+ <p>If every key, after being cast as an integer, is loosely equivalent to the original key, the array is an XML-RPC array; otherwise it is a struct.  Whether the numeric keys are contiguous or even in order is irrelevant: the array is simply iterated with <code>foreach</code> and each key is compared.  The values are then constructed into an XML-RPC array in the order in which they were found.  Is it up to the user to sort array keys beforehand if desired.
+ <p>Note also that an empty array is considered an XML-RPC array.  If an empty struct is required, an object with no public properties should be used instead, as objects are always converted into structs.
+ <p>Although a PHP object is considered to be equivalent to a struct, an XML-RPC struct is always converted into an associative array.
+</div>
+
+ <h3 id="types-null">Null handling</h3>
+<div>
+ <p>XML-RPC has no null type.  As such, using <samp>NULL</samp> when formulating a request or response should be avoided.
+ <p>Nevertheless Xenophobia is capable of dealing with implicit null values and the non-standard explicit <code>nil</code> element.  A value in an XML-RPC message is considered to be null if the <code>value</code> element contains no child elements or contains a <code>nil</code> element.  No other conditions will produce <samp>NULL</samp>.  Unknown values in an XML-RPC message produce an <code>XMLRPCUnknownValue</code> object.  
+ <p>When constructing a message, <samp>NULL</samp> will be represented by an empty <code>value</code> element unless the library is configured to send <code>nil</code> elements.  See <a href="#conf-lib">&sect;2.1</a> for details.  PHP types with no XML-RPC analogue (such as resources) produce an empty <code>string</code> element.
+</div>
+
+ <h3 id="types-datetime">Datetime handling</h3>
+<div>
+ <p>PHP has no native type for dates as such, but PHP 5.2 introduces a <code>DateTime</code> class, which Xenophobia uses in lieu of something else.  When running on versions of PHP prior to 5.2, the <code>DateTime</code> class is emulated with a PHP class that replicates the same basic functionality.  The companion <code>DateTimeZone</code> class is not emulated, since XML-RPC is ambiguous as to timezone handling.
+ <p>Unfortunately the PHP manual has, as of this writing, no useful documentation on the <code>DateTime</code> class---probably because it is still primitive and inconsistent.  Worse, what documentation there is is apparently inaccurate.  Therefore, the class should probably only be used for extracting the current date or time with the <code>format</code> method.  Still, since there are no better options, below is a table summarizing the emulated class' methods.  It has no public properties.
+ <table>
+  <caption><code>DateTime</code> class methods</caption>
+  <thead>
+   <tr>
+    <th>Method
+    <th>Notes
+  <tbody>
+   <tr>
+    <td><samp><var>DateTime</var>  DateTime::__construct ( [<var>string time</var> [, <var>DateTimeZone timezone</var>]] )</samp>
+    <td><var>time</var> is of the format accepted by <code>strtotime</code>; <var>timezone</var> is ignored
+   <tr>
+    <td><samp><var>string</var> DateTime::format ( <var>string format</var> )</samp>
+    <td>Analogous to the <code>date</code> function
+   <tr>
+    <td><samp><var>int</var> DateTime::getOffset ( <var>void</var> )</samp>
+    <td>Returns timezone offset in seconds
+   <tr>
+    <td><samp><var>DateTimeZone</var> DateTime::getTimezone ( <var>void</var> )</samp>
+    <td>This method is a no-op
+   <tr>
+    <td><samp><var>void</var> DateTime::modify ( <var>string modification</var> )</samp>
+    <td><var>modification</var> is of the format accepted by <code>strtotime</code>
+   <tr>
+    <td><samp><var>void</var> DateTime::setDate ( <var>int year</var>, <var>int month</var>, <var>int day</var> )</samp>
+   <tr>
+    <td><samp><var>void</var> DateTime::setISODate ( <var>int year</var>, <var>int week</var> [, <var>int day</var>] )</samp>
+   <tr>
+    <td><samp><var>void</var> DateTime::setTime ( <var>int hour</var>, <var>int minute</var> [, <var>int second</var>] )</samp>
+   <tr>
+    <td><samp><var>void</var> DateTime::setTimezone ( <var>DateTimeZone timezone</var> )</samp>
+    <td>This method is a no-op
+ </table>
+ </div>
+ <h3 id="types-base64">Base64-encoded data</h3>
+ <div>
+ <p>Although PHP has adequate facilities for dealing with base64-encoded strings, there is no way to disambiguate between a string that is encoded and one that is not.  Therefore, when wishing to send a base64-encoded string in a request or response, one must use the <code>XMLRPCBase64</code> class directly:
+ <p class="samp"><samp><var>XMLRPCBase64</var> XMLRPCBase64::__construct ( <var>string data</var> )</samp>
+ <p>Base64-encoded data received in a message is automatically decoded and provided as a string, however.
+ </div>
+</div>
+
+<div id="append-types">
+ <h2>Type conversion tables</h2>
+ <table>
+  <caption>Type conversion: PHP to XML-RPC</caption>
+  <thead>
+   <tr>
+    <th>PHP
+    <th>Intermediary class
+    <th>XML-RPC
+  <tfoot>
+   <tr>
+    <td colspan="3">Notes:
+     <ol>
+      <li>XML-RPC has no "null" type.  A non-standard extension introduces a &lt;nil> element, but the library does not make use of it by default.  See <a href="#conf-lib">&sect;2.1</a> for details.
+      <li>Empty arrays or arrays where all keys are integer-like (eg. <samp>2</samp>, <samp>"3"</samp>) are converted to XML-RPC arrays.  Anything else is converted to a struct.  If an empty struct is desired, use an object rather than an array.
+      <li>PHP 5.2 introduces a predefined DateTime class.  For earlier versions of PHP a close approximation is emulated.
+      <li>XMLRPCExceptions can be either thrown or returned by the server with the same effect.  Faults received by the client are returned, but can be thrown if desired.  See <a href="#conf-client">&sect;2.3</a> for details.
+     </ol>
+  <tbody>
+   <tr>
+    <td>Null
+    <td>XMLRPCNull
+    <td>nothing <em>or</em> &lt;nil> [1]
+   <tr>
+    <td>String
+    <td>XMLRPCString
+    <td>&lt;string>
+   <tr>
+    <td>Integer
+    <td>XMLRPCInt
+    <td>&lt;int>
+   <tr>
+    <td>Float
+    <td>XMLRPCFloat
+    <td>&lt;double>
+   <tr>
+    <td>Boolean
+    <td>XMLRPCBoolean
+    <td>&lt;boolean>
+   <tr>
+    <td>Array
+    <td>XMLRPCArray <em>or</em> XMLRPCStruct [2]
+    <td>&lt;array> <em>or</em> &lt;struct> [2]
+   <tr>
+    <td>new DateTime() [3]
+    <td>XMLRPCDate
+    <td>&lt;dateTime.iso8601>
+   <tr>
+    <td>Object
+    <td>XMLRPCStruct
+    <td>&lt;struct>
+   <tr>
+    <td>
+    <td>XMLRPCBase64
+    <td>&lt;base64>
+   <tr>
+    <td>
+    <td>XMLRPCException [4]
+    <td>&lt;fault>
+   <tr>
+    <td>(anything else)
+    <td>XMLRPCUnknownValue
+    <td>empty &lt;string>
+ </table>
+
+ <table>
+  <caption>Type conversion: XML-RPC to PHP</caption>
+  <thead>
+   <tr>
+    <th>XML-RPC
+    <th>Intermediary class
+    <th>PHP
+  <tfoot>
+   <tr>
+    <td colspan="3">Notes:
+     <ol>
+      <li>XML-RPC has no "null" type.  A non-standard extension introduces a &lt;nil> element, but the library does not make use of it by default.  See <a href="#conf-lib">&sect;2.1</a> for details.
+      <li>Array keys in struct arrays are preserved.
+      <li>PHP 5.2 introduces a predefined DateTime class.  For earlier versions of PHP a close approximation is emulated.
+      <li>The resultant string is decoded, of course.
+      <li>Faults received by the client are returned, but can be thrown if desired.  See <a href="#conf-client">&sect;2.3</a> for details.
+     </ol>
+  <tbody>
+   <tr>
+    <td>nothing <em>or</em> &lt;nil> [1]
+    <td>XMLRPCNull
+    <td>Null
+   <tr>
+    <td>&lt;string>
+    <td>XMLRPCString
+    <td>String
+   <tr>
+    <td>&lt;int> <em>or</em> &lt;i4>
+    <td>XMLRPCInt
+    <td>Integer
+   <tr>
+    <td>&lt;double>
+    <td>XMLRPCFloat
+    <td>Float
+   <tr>
+    <td>&lt;boolean>
+    <td>XMLRPCBoolean
+    <td>Boolean
+   <tr>
+    <td>&lt;array>
+    <td>XMLRPCArray
+    <td>Array
+   <tr>
+    <td>&lt;struct>
+    <td>XMLRPCStruct
+    <td>Array [2]
+   <tr>
+    <td>&lt;dateTime.iso8601>
+    <td>XMLRPCDate
+    <td>new DateTime() [3]
+   <tr>
+    <td>&lt;base64>
+    <td>XMLRPCBase64
+    <td>String [4]
+   <tr>
+    <td>&lt;fault>
+    <td>XMLRPCException [5]
+    <td>
+   <tr>
+    <td>(anything else)
+    <td>XMLRPCUnknownValue
+    <td>
+ </table>
+
+ <table>
+  <caption>XML-RPC type constructor usage</caption>
+  <thead>
+   <tr>
+    <th>Class
+    <th>arguments
+  <tbody>
+   <tr>
+    <th>XMLRPCNull
+    <td><samp>( <var>void</var> )</samp>
+   <tr>
+    <th>XMLRPCString
+    <td><samp>( [<var>string string</var>] )</samp>
+   <tr>
+    <th>XMLRPCInt
+    <td><samp>( <var>int integer</var> )</samp>
+   <tr>
+    <th>XMLRPCFloat
+    <td><samp>( <var>float float</var> )</samp>
+   <tr>
+    <th>XMLRPCBoolean
+    <td><samp>( <var>bool boolean</var> )</samp>
+   <tr>
+    <th>XMLRPCArray
+    <td><samp>( <var>mixed members</var> )</samp>
+   <tr>
+    <th>XMLRPCStruct
+    <td><samp>( <var>mixed members</var> )</samp>
+   <tr>
+    <th>XMLRPCDate
+    <td><samp>( <var>mixed datetime</var> )</samp>
+   <tr>
+    <th>XMLRPCBase64
+    <td><samp>( <var>string data</var> )</samp>
+   <tr>
+    <th>XMLRPCException
+    <td><samp>( [<var>string message</var> [, <var>int code</var>]] )</samp>
+   <tr>
+    <th>XMLRPCUnknownValue
+    <td><samp>( <var>void</var> )</samp>
+ </table>
+      </div>
+
+<div id="append-schema">
+ <h2>RELAX NG schema</h2>
+ <p>Below is the RELAX NG schema (in compact form) used by Xenophobia to ensure data integrity.  It makes allowances for both the explicit &lt;nil> element and implicit null values.
+ <pre>
+grammar {
+ start = (element methodCall { Method &amp; CallParams? } | element methodResponse { RespParams | Fault })
+ Method = element methodName { text }
+ CallParams = element params { element param { Value }* }
+ RespParams = element params { element param { Value } }
+ Value = element value { ValueInt | ValueDouble | ValueBoolean | ValueString | ValueBase64 | ValueDate | ValueArray | ValueStruct | ValueNullImplicit | ValueNullExplicit }
+ ValueInt = (element int { text } | element i4 { text })
+ ValueDouble = element double { text }
+ ValueBoolean = element boolean { "1" | "0" }
+ ValueString = element string { text }
+ ValueBase64 = element base64 { text }
+ ValueDate = element dateTime.iso8601 { text }
+ ValueArray = element array { element data { Value* }? }
+ ValueStruct = element struct { element member { element name { text }&amp; Value }* }
+ ValueNullImplicit = empty
+ ValueNullExplicit = element nil { empty }
+ Fault = element fault { 
+  element value { 
+   element struct {
+    element member { element name { "faultCode" }&amp; element value { ValueInt } },
+    element member { element name { "faultString" }&amp; element value { ValueString } }
+   }
+  }
+ }
+}</pre>
+</div>
+
+<div id="append-ext">
+ <h2>Extending the library</h2>
+ <p>Xenophobia should be fairly easy to extend.  Though it was not designed with user extensibility in mind, it was designed to be as modular as practical for its feature-set.
+ <p>System procedures implemented by the server are defined just as any other procedure call (ie. with <code>XMLRPCServer::addCall()</code>) and are handled no differently from user-defined calls.
+ <p>Types, unfortunately, are somewhat more difficult.  Although all types implement the same interface (<code>XMLRPCValue</code>) and conversion from the intermediary types to DOM nodes or native types is self-contained, conversion <em>to</em> these intermediary types from native types is handled by the static method <code>XMLRPCLib::nativeToRPC()</code>.  Furthermore, conversion from DOM nodes bypasses the intermediary classes, producing native values directly with <code>XMLRPCLib::nodeToNative()</code>.  Both these methods would need to be edited to add types.
+ <p>To complicate matters further, the list of types in the RELAX NG schema is, naturally, rigid.  This would require either the schema to be edited or schema validation to be disabled.
+</div>
+
+<div id="append-credits">
+ <h2>Credits and licensing</h2>
+ <p>Xenophobia and its manual (ie. this document) were written by <a href="http://jkingweb.ca/">J. King</a>.  They are both licensed under the <a href="http://creativecommons.org/licenses/by/2.5/">Creative Commons Attribution</a> license (v2.5).
+ <p>The server self-test stylesheet and this manual's stylesheet were written by <a href="http://dustinwilson.com/">Dustin Wilson</a>.  They are likewise both licensed under the <a href="http://creativecommons.org/licenses/by/2.5/">Creative Commons Attribution</a> license (v2.5).
+ <p>The RELAX NG schema used in Xenophobia was generated from the compact schema in <a href="#append-schema">Appendix B</a> using <a href="http://www.thaiopensource.com/relaxng/trang.html">Trang</a> and then compacted using a pattern replacement.
+ <p>Thanks go out to the aforementioned Dustin Wilson for his sense of style and years of friendship.  An uneasy thanks also goes to <a href="http://web.archive.org/">The Internet Archive</a> for having archive copies of all the XML-RPC extension specifications I know about: half of them no longer exist at their original locations. 
+</div>
+
+<h2 id="append-history">Revision history</h2>
+<dl>
+ <dt><a href="http://jkingweb.ca/code/php/lib.xmlrpc/archives?rev=20090401">2009-04-01</a>
+  <dd>Several changes: 
+   <ul>
+    <li>Added comments throughout code
+    <li>XMLRPCArray::__construct() now only takes a single array (or object) as its argument to avoid ambiguity in processing.  This is a potentially backwards-incompatible change
+    <li>Changed code style of library (but not examples) to be closer to Python syntax
+    <li>Cut memory usage in client a little
+    <li>Specified the outgoing character set to be UTF-8 in HTTP headers
+    <li>Fixed hypothetical empty capabilities fallback to use the correct 'stdClass' instead of 'Object'
+    <li>Made self-test run on every HTTP method other than POST and HEAD instead of GET only
+    <li>Self-test now prints every method signature instead of just the first
+    <li>Added version and timezone information to self-test
+    <li>Updated various URI references in code and manual
+    <li>Minor typographic corrections to the manual
+   </ul>
+ <dt><a href="http://jkingweb.ca/code/php/lib.xmlrpc/archives?rev=20070207">2007-02-07</a>
+  <dd>Fixed error in self-test HTTP header.  Oops.
+ <dt><a href="http://jkingweb.ca/code/php/lib.xmlrpc/archives?rev=20070205">2007-02-05</a>
+  <dd>First release.
+</dl>
