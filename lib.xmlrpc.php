@@ -607,7 +607,7 @@ class XMLRPCServer extends XMLRPCLib {
      'specVersion' => 20030630,
     ), 
    'capabilities' => array(
-     'specUrl' => "http://tech.groups.yahoo.com/group/xml-rpc/message/2897",
+     'specUrl' => "http://tech.groups.yahoo.com/group/xml-rpc/message/2897", //gone; see https://web.archive.org/web/20090318122448/http://tech.groups.yahoo.com/group/xml-rpc/message/2897
      'specVersion' => 20010514,
     ),
    'faults_interop' => array(
@@ -619,7 +619,7 @@ class XMLRPCServer extends XMLRPCLib {
      'specVersion' => 20010310,
     ), 
    'nil' => array(
-     'specUrl' => "http://ontosys.com/xml-rpc/extensions.php",
+     'specUrl' => "http://ontosys.com/xml-rpc/extensions.php",      //gone; see https://web.archive.org/web/20130120074804/http://ontosys.com/xml-rpc/extensions.php
      'specVersion' => 20001211,
     ),
    'system_multicall' => array(
